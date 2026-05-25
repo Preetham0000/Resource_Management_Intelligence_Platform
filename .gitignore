@@ -1,0 +1,74 @@
+# ==========================================
+# Global & System Files
+# ==========================================
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+.env
+.env.local
+
+# ==========================================
+# IDE & Text Editors
+# ==========================================
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+
+ ==========================================
+# Module 1: Frontend (ReactJS)
+# ==========================================
+frontend-react/node_modules/
+frontend-react/build/
+frontend-react/dist/
+frontend-react/.pnp/
+frontend-react/.pnp.js
+frontend-react/coverage/
+
+# ==========================================
+# Module 2: Backend (Spring Boot)
+# ==========================================
+backend-springboot/target/
+backend-springboot/bin/
+backend-springboot/.gradle/
+backend-springboot/build/
+backend-springboot/.settings/
+backend-springboot/.classpath
+backend-springboot/.project
+backend-springboot/*.jar
+backend-springboot/*.war
+
+# ==========================================
+# Module 3: AI Engine (Python FastAPI)
+# ==========================================
+python-ml-service/__pycache__/
+python-ml-service/**/*.pyc
+python-ml-service/**/*.pyo
+python-ml-service/**/*.pyd
+python-ml-service/.pytest_cache/
+python-ml-service/.venv/
+python-ml-service/venv/
+python-ml-service/env/
+python-ml-service/ENV/
+python-ml-service/*.pkl
+python-ml-service/*.joblib
+
+# ==========================================
+# Module 4: Real-time (NodeJS)
+# ==========================================
+node-notification-service/node_modules/
+node-notification-service/npm-debug.log*
+node-notification-service/yarn-debug.log*
+node-notification-service/yarn-error.log*
+
+# ==========================================
+# Shared Data Engineering & Storage
+# ==========================================
+data-engineering/mock_data/*.csv
+data-engineering/mock_data/*.xlsx
+**/mysql-data/

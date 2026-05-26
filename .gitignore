@@ -23,12 +23,12 @@ Thumbs.db
  ==========================================
 # Module 1: Frontend (ReactJS)
 # ==========================================
-frontend-react/node_modules/
-frontend-react/build/
-frontend-react/dist/
-frontend-react/.pnp/
-frontend-react/.pnp.js
-frontend-react/coverage/
+project-iq/node_modules/
+project-iq/build/
+project-iq/dist/
+project-iq/.pnp/
+project-iq/.pnp.js
+project-iq/coverage/
 
 # ==========================================
 # Module 2: Backend (Spring Boot)
@@ -72,3 +72,4 @@ node-notification-service/yarn-error.log*
 data-engineering/mock_data/*.csv
 data-engineering/mock_data/*.xlsx
 **/mysql-data/
+

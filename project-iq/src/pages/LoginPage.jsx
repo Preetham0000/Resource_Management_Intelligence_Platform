@@ -1,27 +1,74 @@
 import { useState } from "react";
-import { saveAuth } from "../utils/auth";
+import { loginUser, registerUser, saveAuth } from "../utils/auth";
 const ROLES = ["Admin", "Manager", "Developer"];
 
 export default function LoginPage({ onLogin }) {
-  const [email, setEmail]       = useState("admin@projectiq.app");
+  // Login form states
+  const [username, setUsername]       = useState("admin");
   const [password, setPassword] = useState("");
   const [role, setRole]         = useState("Admin");
   const [showPw, setShowPw]     = useState(false);
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState("");
 
+  // Signup form states
+  const [isSignup, setIsSignup] = useState(false);
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupPassword, setSignupPassword] = useState("");
+  const [signupConfirm, setSignupConfirm] = useState("");
+  const [signupName, setSignupName] = useState("");
+  const [showSignupPw, setShowSignupPw] = useState(false);
+  const [showSignupConfirm, setShowSignupConfirm] = useState(false);
+
 
 const handleLogin = async (e) => {
   e.preventDefault();
   setError("");
-  if (!email || !password) {
+  if (!username || !password) {
     setError("Please fill in all fields.");
     return;
   }
   setLoading(true);
-  await new Promise((r) => setTimeout(r, 1000));
-  setLoading(false);
-  onLogin(role);
+  try {
+    const data = await loginUser({ username, password });
+    saveAuth(data.token, role);
+    onLogin(role);
+  } catch (err) {
+    setError(err.message || "Login failed. Please try again.");
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleSignup = async (e) => {
+  e.preventDefault();
+  setError("");
+  if (!signupName || !signupEmail || !signupPassword || !signupConfirm) {
+    setError("Please fill in all fields.");
+    return;
+  }
+  if (signupPassword !== signupConfirm) {
+    setError("Passwords do not match.");
+    return;
+  }
+  if (signupPassword.length < 6) {
+    setError("Password must be at least 6 characters long.");
+    return;
+  }
+  setLoading(true);
+  try {
+    const data = await registerUser({
+      username: signupEmail,
+      password: signupPassword,
+      role: "ROLE_DEVELOPER",
+    });
+    saveAuth(data.token, "Developer");
+    onLogin("Developer");
+  } catch (err) {
+    setError(err.message || "Registration failed. Please try again.");
+  } finally {
+    setLoading(false);
+  }
 };
 
   return (
@@ -70,91 +117,203 @@ const handleLogin = async (e) => {
         display: "flex", flexDirection: "column", justifyContent: "center",
       }}>
         <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, marginBottom: 6 }}>
-          Welcome back
+          {isSignup ? "Create Account" : "Welcome back"}
         </div>
         <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 24 }}>
-          Sign in to your account to continue
+          {isSignup ? "Sign up to get started with ProjectIQ" : "Sign in to your account to continue"}
         </div>
 
-        <form onSubmit={handleLogin}>
-          {/* Email */}
-          <div style={{ marginBottom: 10 }}>
-            <div style={labelSt}>Email address</div>
-            <input
-              type="email" value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@projectiq.app"
-              style={inputSt}
-            />
-          </div>
-
-          {/* Password */}
-          <div style={{ marginBottom: 18, position: "relative" }}>
-            <div style={labelSt}>Password</div>
-            <div style={{ position: "relative" }}>
+        {!isSignup ? (
+          // LOGIN FORM
+          <form onSubmit={handleLogin}>
+            {/* Username */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={labelSt}>Username</div>
               <input
-                type={showPw ? "text" : "password"}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••••"
-                style={{ ...inputSt, paddingRight: 40 }}
+                type="text" value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder="admin"
+                style={inputSt}
               />
-              <button type="button" onClick={() => setShowPw((v) => !v)} style={{
-                position: "absolute", right: 10, top: "50%",
-                transform: "translateY(-50%)",
-                background: "none", border: "none", cursor: "pointer",
-                color: "var(--muted)", fontSize: 12,
-              }}>{showPw ? "hide" : "show"}</button>
             </div>
-          </div>
 
-          {/* Role selector */}
-          <div style={{
-            background: "var(--wire)", border: "1px solid var(--wire2)",
-            borderRadius: 4, padding: "8px 10px", marginBottom: 14,
-          }}>
-            <div style={{ ...labelSt, marginBottom: 6 }}>Role</div>
-            <div style={{ display: "flex", gap: 6 }}>
-              {ROLES.map((r) => (
-                <button
-                  key={r} type="button" onClick={() => setRole(r)}
-                  style={{
-                    fontFamily: "'DM Mono', monospace", fontSize: 10,
-                    padding: "3px 8px", borderRadius: 3, cursor: "pointer",
-                    border: role === r ? "1px solid var(--accent)" : "1px solid var(--border)",
-                    color: role === r ? "var(--accent)" : "var(--muted)",
-                    background: role === r ? "#4f7cff18" : "transparent",
-                  }}
-                >{r}</button>
-              ))}
+            {/* Password */}
+            <div style={{ marginBottom: 18, position: "relative" }}>
+              <div style={labelSt}>Password</div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showPw ? "text" : "password"}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••••"
+                  style={{ ...inputSt, paddingRight: 40 }}
+                />
+                <button type="button" onClick={() => setShowPw((v) => !v)} style={{
+                  position: "absolute", right: 10, top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--muted)", fontSize: 12,
+                }}>{showPw ? "hide" : "show"}</button>
+              </div>
             </div>
-          </div>
 
-          {/* Error */}
-          {error && (
+            {/* Role selector */}
             <div style={{
-              fontSize: 11, color: "var(--accent3)", marginBottom: 10,
-              padding: "6px 10px", background: "#ff6b6b10",
-              border: "1px solid #ff6b6b33", borderRadius: 4,
-            }}>⚠ {error}</div>
-          )}
+              background: "var(--wire)", border: "1px solid var(--wire2)",
+              borderRadius: 4, padding: "8px 10px", marginBottom: 14,
+            }}>
+              <div style={{ ...labelSt, marginBottom: 6 }}>Role</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                {ROLES.map((r) => (
+                  <button
+                    key={r} type="button" onClick={() => setRole(r)}
+                    style={{
+                      fontFamily: "'DM Mono', monospace", fontSize: 10,
+                      padding: "3px 8px", borderRadius: 3, cursor: "pointer",
+                      border: role === r ? "1px solid var(--accent)" : "1px solid var(--border)",
+                      color: role === r ? "var(--accent)" : "var(--muted)",
+                      background: role === r ? "#4f7cff18" : "transparent",
+                    }}
+                  >{r}</button>
+                ))}
+              </div>
+            </div>
 
-          {/* Submit */}
-          <button type="submit" disabled={loading} style={{
-            width: "100%", padding: 9,
-            fontFamily: "'DM Mono', monospace", fontSize: 11,
-            background: "var(--accent)", color: "#fff",
-            border: "1px solid var(--accent)", borderRadius: 6,
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.7 : 1, marginBottom: 10,
-          }}>
-            {loading ? "Signing in…" : `Sign In as ${role} →`}
+            {/* Error */}
+            {error && (
+              <div style={{
+                fontSize: 11, color: "var(--accent3)", marginBottom: 10,
+                padding: "6px 10px", background: "#ff6b6b10",
+                border: "1px solid #ff6b6b33", borderRadius: 4,
+              }}>⚠ {error}</div>
+            )}
+
+            {/* Submit */}
+            <button type="submit" disabled={loading} style={{
+              width: "100%", padding: 9,
+              fontFamily: "'DM Mono', monospace", fontSize: 11,
+              background: "var(--accent)", color: "#fff",
+              border: "1px solid var(--accent)", borderRadius: 6,
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.7 : 1, marginBottom: 10,
+            }}>
+              {loading ? "Signing in…" : `Sign In as ${role} →`}
+            </button>
+
+            <div style={{ textAlign: "center", fontSize: 10, color: "var(--muted)" }}>
+              POST /api/auth/login · JWT token returned
+            </div>
+          </form>
+        ) : (
+          // SIGNUP FORM
+          <form onSubmit={handleSignup}>
+            {/* Full Name */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={labelSt}>Full Name</div>
+              <input
+                type="text" value={signupName}
+                onChange={(e) => setSignupName(e.target.value)}
+                placeholder="John Doe"
+                style={inputSt}
+              />
+            </div>
+
+            {/* Email */}
+            <div style={{ marginBottom: 10 }}>
+              <div style={labelSt}>Email address</div>
+              <input
+                type="email" value={signupEmail}
+                onChange={(e) => setSignupEmail(e.target.value)}
+                placeholder="you@projectiq.app"
+                style={inputSt}
+              />
+            </div>
+
+            {/* Password */}
+            <div style={{ marginBottom: 10, position: "relative" }}>
+              <div style={labelSt}>Password</div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showSignupPw ? "text" : "password"}
+                  value={signupPassword}
+                  onChange={(e) => setSignupPassword(e.target.value)}
+                  placeholder="••••••••••"
+                  style={{ ...inputSt, paddingRight: 40 }}
+                />
+                <button type="button" onClick={() => setShowSignupPw((v) => !v)} style={{
+                  position: "absolute", right: 10, top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--muted)", fontSize: 12,
+                }}>{showSignupPw ? "hide" : "show"}</button>
+              </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div style={{ marginBottom: 18, position: "relative" }}>
+              <div style={labelSt}>Confirm Password</div>
+              <div style={{ position: "relative" }}>
+                <input
+                  type={showSignupConfirm ? "text" : "password"}
+                  value={signupConfirm}
+                  onChange={(e) => setSignupConfirm(e.target.value)}
+                  placeholder="••••••••••"
+                  style={{ ...inputSt, paddingRight: 40 }}
+                />
+                <button type="button" onClick={() => setShowSignupConfirm((v) => !v)} style={{
+                  position: "absolute", right: 10, top: "50%",
+                  transform: "translateY(-50%)",
+                  background: "none", border: "none", cursor: "pointer",
+                  color: "var(--muted)", fontSize: 12,
+                }}>{showSignupConfirm ? "hide" : "show"}</button>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div style={{
+                fontSize: 11, color: "var(--accent3)", marginBottom: 10,
+                padding: "6px 10px", background: "#ff6b6b10",
+                border: "1px solid #ff6b6b33", borderRadius: 4,
+              }}>⚠ {error}</div>
+            )}
+
+            {/* Submit */}
+            <button type="submit" disabled={loading} style={{
+              width: "100%", padding: 9,
+              fontFamily: "'DM Mono', monospace", fontSize: 11,
+              background: "var(--accent)", color: "#fff",
+              border: "1px solid var(--accent)", borderRadius: 6,
+              cursor: loading ? "not-allowed" : "pointer",
+              opacity: loading ? 0.7 : 1, marginBottom: 10,
+            }}>
+              {loading ? "Creating account…" : "Sign Up →"}
+            </button>
+
+            <div style={{ textAlign: "center", fontSize: 10, color: "var(--muted)" }}>
+              POST /api/auth/register · Account created
+            </div>
+          </form>
+        )}
+
+        {/* Toggle Button */}
+        <div style={{ textAlign: "center", fontSize: 11, color: "var(--muted)", marginTop: 16 }}>
+          {isSignup ? "Already have an account? " : "Don't have an account? "}
+          <button
+            type="button"
+            onClick={() => {
+              setIsSignup(!isSignup);
+              setError("");
+            }}
+            style={{
+              background: "none", border: "none", color: "var(--accent)",
+              cursor: "pointer", fontWeight: 600, fontSize: 11,
+              textDecoration: "underline", fontFamily: "'DM Sans', sans-serif",
+            }}
+          >
+            {isSignup ? "Sign In" : "Sign Up"}
           </button>
-
-          <div style={{ textAlign: "center", fontSize: 10, color: "var(--muted)" }}>
-            POST /api/auth/login · JWT token returned
-          </div>
-        </form>
+        </div>
       </div>
     </div>
   );

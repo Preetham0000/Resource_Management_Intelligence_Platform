@@ -4,10 +4,10 @@ import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class ResourceManagementIntelligencePlatformApplication {
+public class BackendSpringbootApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(ResourceManagementIntelligencePlatformApplication.class, args);
+		SpringApplication.run(BackendSpringbootApplication.class, args);
 	}
 
 }

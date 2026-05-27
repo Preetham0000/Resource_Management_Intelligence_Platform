@@ -1,34 +1,74 @@
 import { useState, useEffect } from "react";
-import Layout, { Chip, BtnWire, Avatar, Annotation, WBox, TableBase } from "../components/Layout";
-import { authFetch } from "../utils/auth";
-
-const PROJECTS = [
-  { name:"CRM Revamp",        manager:"R. Sharma",  mi:"RS", start:"Dec 01, 2024", end:"Mar 15, 2025", status:"At Risk",  risk:72, progress:55 },
-  { name:"Supply Chain AI",   manager:"M. Kumar",   mi:"MK", start:"Nov 15, 2024", end:"Feb 28, 2025", status:"Moderate", risk:55, progress:62 },
-  { name:"HR Portal 3.0",     manager:"N. Joshi",   mi:"NJ", start:"Jan 20, 2025", end:"Apr 01, 2025", status:"On Track", risk:18, progress:88 },
-  { name:"Retail Analytics",  manager:"P. Mehta",   mi:"PM", start:"Jan 05, 2025", end:"Mar 30, 2025", status:"On Track", risk:12, progress:74 },
-];
-
-const statusColor = { "At Risk":"red", "Moderate":"yellow", "On Track":"green" };
+import Layout, { BtnWire, Annotation, WBox, TableBase } from "../components/Layout";
+import { getProjects, createProject, updateProject, deleteProject } from "../utils/api";
 
 export default function ProjectsPage({ onNav }) {
   const [showForm, setShowForm] = useState(false);
-  const [projects, setProjects] = useState(PROJECTS);
+  const [projects, setProjects] = useState([]);
+  const [error, setError] = useState("");
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
-    authFetch("/api/projects")
-      .then(data => setProjects(data));
+    loadProjects();
   }, []);
-  const [form, setForm] = useState({ name:"", manager:"", start:"", end:"" });
 
-  const add = () => {
+  const loadProjects = async () => {
+    try {
+      const data = await getProjects();
+      setProjects(data || []);
+    } catch (err) {
+      setError(err.message);
+      console.error(err);
+    }
+  };
+
+  const [form, setForm] = useState({ name:"", description:"", startDate:"", endDate:"" });
+
+  const add = async () => {
     if (!form.name) return;
-    setProjects(p => [...p, {
-      name: form.name, manager: form.manager, mi: form.manager.slice(0,2).toUpperCase(),
-      start: form.start, end: form.end, status:"On Track", risk:0, progress:0,
-    }]);
-    setShowForm(false);
-    setForm({ name:"", manager:"", start:"", end:"" });
+    try {
+      if (editingId) {
+        await updateProject(editingId, {
+          name: form.name,
+          description: form.description,
+          startDate: form.startDate,
+          endDate: form.endDate,
+        });
+        setEditingId(null);
+      } else {
+        await createProject({
+          name: form.name,
+          description: form.description,
+          startDate: form.startDate,
+          endDate: form.endDate,
+        });
+      }
+      setShowForm(false);
+      setForm({ name:"", description:"", startDate:"", endDate:"" });
+      loadProjects();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await deleteProject(id);
+      loadProjects();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleEdit = (project) => {
+    setForm({
+      name: project.name,
+      description: project.description || "",
+      startDate: project.startDate || "",
+      endDate: project.endDate || "",
+    });
+    setEditingId(project.id);
+    setShowForm(true);
   };
 
   return (
@@ -42,13 +82,13 @@ export default function ProjectsPage({ onNav }) {
       {/* Create form */}
       {showForm && (
         <WBox style={{ padding:14, marginBottom:14, borderColor:"#4f7cff33" }}>
-          <div style={monoLabel}>Create New Project</div>
+          <div style={monoLabel}>{editingId ? "Edit Project" : "Create New Project"}</div>
           <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:10 }}>
             {[
               ["Project Name", "name", "CRM Revamp v2"],
-              ["Manager", "manager", "R. Sharma"],
-              ["Start Date", "start", "2025-02-01"],
-              ["End Date", "end", "2025-05-01"],
+              ["Description", "description", "Project description"],
+              ["Start Date", "startDate", "2025-02-01"],
+              ["End Date", "endDate", "2025-05-01"],
             ].map(([label, key, ph]) => (
               <div key={key}>
                 <div style={fieldLabel}>{label}</div>
@@ -56,48 +96,36 @@ export default function ProjectsPage({ onNav }) {
                   placeholder={ph} value={form[key]}
                   onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                   style={inputSt}
+                  type={key.includes("Date") ? "date" : "text"}
                 />
               </div>
             ))}
           </div>
           <div style={{ display:"flex", gap:8, justifyContent:"flex-end" }}>
-            <BtnWire onClick={() => setShowForm(false)}>Cancel</BtnWire>
-            <BtnWire primary onClick={add}>Save Project →</BtnWire>
+            <BtnWire onClick={() => {setShowForm(false); setEditingId(null); setForm({ name:"", description:"", startDate:"", endDate:"" });}}>Cancel</BtnWire>
+            <BtnWire primary onClick={add}>{editingId ? "Update Project →" : "Save Project →"}</BtnWire>
           </div>
         </WBox>
       )}
 
+      {error && (
+        <div style={{ padding:10, background:"#ff6b6b18", border:"1px solid #ff6b6b33", borderRadius:4, marginBottom:14, fontSize:11, color:"var(--accent3)" }}>
+          ⚠ {error}
+        </div>
+      )}
+
       <WBox style={{ overflow:"hidden" }}>
-        <TableBase headers={["Project","Manager","Start","End","Status","Risk","Progress","Actions"]}>
+        <TableBase headers={["Project","Description","Start","End","Actions"]}>
           {projects.map((p, i) => (
             <tr key={i} style={{ borderBottom:"1px solid var(--border)" }}>
               <td style={{ padding:"8px 10px", color:"var(--text)", fontWeight:600, fontSize:11 }}>{p.name}</td>
-              <td style={tdSt}>
-                <div style={{ display:"flex", alignItems:"center", gap:6 }}>
-                  <Avatar initials={p.mi} /> {p.manager}
-                </div>
-              </td>
-              <td style={tdSt}>{p.start}</td>
-              <td style={tdSt}>{p.end}</td>
-              <td style={tdSt}><Chip color={statusColor[p.status]}>{p.status}</Chip></td>
-              <td style={tdSt}>
-                <Chip color={statusColor[p.status]}>{p.risk}%</Chip>
-              </td>
-              <td style={tdSt}>
-                <div style={{
-                  background:"var(--border)", borderRadius:3,
-                  height:5, width:80, overflow:"hidden",
-                }}>
-                  <div style={{
-                    height:"100%", borderRadius:3,
-                    background:"var(--accent)", width:`${p.progress}%`,
-                  }}/>
-                </div>
-              </td>
+              <td style={tdSt}>{p.description || "-"}</td>
+              <td style={tdSt}>{p.startDate || "-"}</td>
+              <td style={tdSt}>{p.endDate || "-"}</td>
               <td style={tdSt}>
                 <div style={{ display:"flex", gap:4 }}>
-                  <BtnWire>Edit</BtnWire>
-                  <BtnWire>Archive</BtnWire>
+                  <BtnWire onClick={() => handleEdit(p)}>Edit</BtnWire>
+                  <BtnWire onClick={() => handleDelete(p.id)}>Delete</BtnWire>
                 </div>
               </td>
             </tr>

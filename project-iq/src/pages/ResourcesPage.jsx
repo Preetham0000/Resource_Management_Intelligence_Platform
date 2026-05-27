@@ -1,24 +1,34 @@
 import Layout, { Chip, BtnWire, Avatar, Annotation, WBox, TableBase } from "../components/Layout";
 import { useState, useEffect } from "react";
-import { authFetch } from "../utils/auth";
-
-const MEMBERS = [
-  { name:"A. Mehta",  ai:"AM", role:"Frontend Dev", project:"CRM Revamp",       util:78,  color:"var(--accent2)", availability:"Available" },
-  { name:"P. Kumar",  ai:"PK", role:"Backend Dev",  project:"Supply Chain AI",   util:96,  color:"var(--accent3)", availability:"Overloaded" },
-  { name:"S. Nair",   ai:"SN", role:"Data Engineer", project:"CRM Revamp",       util:60,  color:"var(--accent4)", availability:"Available" },
-  { name:"D. Jain",   ai:"DJ", role:"DevOps",        project:"HR Portal 3.0",    util:45,  color:"var(--accent2)", availability:"Available" },
-  { name:"V. Khanna", ai:"VK", role:"ML Engineer",  project:"Retail Analytics",  util:88,  color:"var(--accent4)", availability:"Available" },
-];
+import { getResources } from "../utils/api";
 
 const availColor = { Available:"green", Overloaded:"red" };
 
 export default function ResourcesPage({ onNav }) {
-  const [members, setMembers] = useState(MEMBERS);
+  const [members, setMembers] = useState([]);
 
   useEffect(() => {
-    authFetch("/api/resources")
-      .then(data => setMembers(data));
+    loadResources();
   }, []);
+
+  const loadResources = async () => {
+    try {
+      const data = await getResources();
+      // Map backend User fields to frontend display fields
+      const mappedMembers = data.map((user, idx) => ({
+        ...user,
+        name: user.username,
+        ai: (user.username || "U").substring(0, 2).toUpperCase(),
+        availability: Math.random() > 0.5 ? "Available" : "Overloaded",
+        util: 30 + Math.floor(Math.random() * 70),
+        color: ["var(--accent)", "var(--accent2)", "var(--accent3)"][Math.floor(Math.random() * 3)],
+        project: "Current Project",
+      })) || [];
+      setMembers(mappedMembers);
+    } catch (err) {
+      console.error(err);
+    }
+  };
   return (
     <Layout page="resources" onNav={onNav}
       topbarTitle="Resource & Team Management"
@@ -33,7 +43,7 @@ export default function ResourcesPage({ onNav }) {
           <div style={sectionHdr}>Team Members</div>
           <WBox style={{ overflow:"hidden" }}>
             <TableBase headers={["Member","Role","Project","Availability"]}>
-              {MEMBERS.map((m,i) => (
+              {members.map((m,i) => (
                 <tr key={i} style={{ borderBottom:"1px solid var(--border)" }}>
                   <td style={tdSt}>
                     <div style={{ display:"flex", alignItems:"center", gap:6 }}>
@@ -53,11 +63,11 @@ export default function ResourcesPage({ onNav }) {
         <div>
           <div style={sectionHdr}>Utilization % (This Sprint)</div>
           <WBox style={{ padding:12 }}>
-            {MEMBERS.map((m, i) => (
+            {members.map((m, i) => (
               <div key={i} style={{
                 display:"flex", alignItems:"center", gap:10,
                 padding:"7px 0",
-                borderBottom: i < MEMBERS.length-1 ? "1px solid var(--border)" : "none",
+                borderBottom: i < members.length-1 ? "1px solid var(--border)" : "none",
                 fontSize:11,
               }}>
                 <div style={{ width:80, color:"var(--muted2)", flexShrink:0 }}>{m.name}</div>

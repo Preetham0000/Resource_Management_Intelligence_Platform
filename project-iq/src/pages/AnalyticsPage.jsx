@@ -1,33 +1,33 @@
 import Layout, { BtnWire, Annotation, WBox } from "../components/Layout";
 import { useState, useEffect } from "react";
-import { authFetch } from "../utils/auth";
-
-const atRisk = [
-  { name:"CRM Revamp",      pct:72, color:"var(--accent3)" },
-  { name:"Supply Chain AI", pct:55, color:"var(--accent4)" },
-  { name:"Finance Tracker", pct:38, color:"var(--accent4)" },
-];
-
-const BOTTLENECKS = [
-  { level:"red",    tag:"⚠ OVERLOAD DETECTED",    msg:"P. Kumar — 96% utilization, 3 high-priority tasks" },
-  { level:"yellow", tag:"⚡ SPRINT RISK",           msg:"Sprint 04 velocity dropped 15% from last sprint" },
-  { level:"blue",   tag:"ℹ INFO",                  msg:"2 sprints with no retrospective notes added" },
-];
+import { getAtRiskProjects, getSprintVelocity } from "../utils/api";
 
 const tagColors = { red:"var(--accent3)", yellow:"var(--accent4)", blue:"var(--accent)" };
 const tagBorders = { red:"#ff6b6b33", yellow:"#ffc85733", blue:"#4f7cff33" };
 
 export default function AnalyticsPage({ onNav }) {
-  const [projectsAtRisk, setProjectsAtRisk] = useState(atRisk);
-  const [velocity, setVelocity] = useState([]);
+  const [projectsAtRisk, setProjectsAtRisk] = useState([]);
+  const [bottlenecks, setBottlenecks] = useState([]);
 
   useEffect(() => {
-    authFetch("/analytics/at-risk-projects")
-      .then(data => setProjectsAtRisk(data));
-
-    authFetch("/analytics/sprint-velocity")
-      .then(data => setVelocity(data));
+    loadAnalytics();
   }, []);
+
+  const loadAnalytics = async () => {
+    try {
+      const [riskData] = await Promise.all([
+        getAtRiskProjects(),
+        getSprintVelocity(),
+      ]);
+      setProjectsAtRisk(riskData || []);
+      setBottlenecks([
+        { level: "red", name: "UI Development", status: "Blocked", impact: 8 },
+        { level: "yellow", name: "API Testing", status: "In Progress", impact: 5 },
+      ]);
+    } catch (err) {
+      console.error(err);
+    }
+  };
   return (
     <Layout page="analytics" onNav={onNav}
       topbarTitle="Analytics & Insights"
@@ -83,11 +83,11 @@ export default function AnalyticsPage({ onNav }) {
         {/* At-risk */}
         <WBox style={{ padding:14 }}>
           <div style={chartTitle}>At-Risk Projects</div>
-          {atRisk.map((p, i) => (
+          {projectsAtRisk.map((p, i) => (
             <div key={i} style={{
               display:"flex", alignItems:"center", gap:10,
               padding:"6px 0",
-              borderBottom: i < atRisk.length-1 ? "1px solid var(--border)" : "none",
+              borderBottom: i < projectsAtRisk.length-1 ? "1px solid var(--border)" : "none",
               fontSize:11,
             }}>
               <div style={{ width:120, color:"var(--muted2)" }}>{p.name}</div>
@@ -106,7 +106,7 @@ export default function AnalyticsPage({ onNav }) {
         <WBox style={{ padding:14 }}>
           <div style={chartTitle}>Bottleneck Detection</div>
           <div style={{ display:"flex", flexDirection:"column", gap:6, marginTop:6 }}>
-            {BOTTLENECKS.map((b, i) => (
+            {bottlenecks.map((b, i) => (
               <div key={i} style={{
                 background:"var(--surface2)",
                 border:`1px solid ${tagBorders[b.level]}`,

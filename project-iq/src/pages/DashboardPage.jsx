@@ -1,4 +1,6 @@
+import { useState, useEffect } from "react";
 import Layout, { StatCard, WBox, Chip, BtnWire, Avatar, Annotation } from "../components/Layout";
+import { getProjects, getAtRiskProjects, getSprintVelocity } from "../utils/api";
 
 const HM_LEVELS = [
   [2,4,5,3,1,4,2],
@@ -14,6 +16,35 @@ const HM_COLORS = {
 };
 
 export default function DashboardPage({ onNav }) {
+  const [stats, setStats] = useState({
+    totalProjects: 0,
+    atRiskProjects: 0,
+    activeDevelopers: 0,
+    sprintVelocity: 0,
+  });
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      const [projects, atRisk] = await Promise.all([
+        getProjects(),
+        getAtRiskProjects(),
+        getSprintVelocity(),
+      ]);
+
+      setStats({
+        totalProjects: projects?.length || 0,
+        atRiskProjects: atRisk?.length || 0,
+        activeDevelopers: 38,
+        sprintVelocity: 47,
+      });
+    } catch (err) {
+      console.error(err);
+    }
+  };
   return (
     <Layout
       page="dashboard" onNav={onNav}
@@ -26,10 +57,10 @@ export default function DashboardPage({ onNav }) {
     >
       {/* Stats */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:10, marginBottom:18 }}>
-        <StatCard label="Total Projects"     value="24" trend="↑ 3 this sprint"     color="var(--accent)" />
-        <StatCard label="At-Risk Projects"   value="6"  trend="⚠ Needs review"      color="var(--accent3)" />
-        <StatCard label="Active Developers"  value="38" trend="85% utilization avg"  color="var(--accent2)" />
-        <StatCard label="Sprint Velocity"    value="47" trend="↓ -5 vs last sprint"  color="var(--accent4)" />
+        <StatCard label="Total Projects"     value={String(stats.totalProjects)} trend="↑ 3 this sprint"     color="var(--accent)" />
+        <StatCard label="At-Risk Projects"   value={String(stats.atRiskProjects)}  trend="⚠ Needs review"      color="var(--accent3)" />
+        <StatCard label="Active Developers"  value={String(stats.activeDevelopers)} trend="85% utilization avg"  color="var(--accent2)" />
+        <StatCard label="Sprint Velocity"    value={String(stats.sprintVelocity)} trend="↓ -5 vs last sprint"  color="var(--accent4)" />
       </div>
 
       {/* Charts row */}

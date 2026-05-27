@@ -9,7 +9,7 @@ import TasksPage     from "./pages/TasksPage";
 import ResourcesPage from "./pages/ResourcesPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import RiskPage      from "./pages/RiskPage";
-import { isLoggedIn, getRole } from "./utils/auth";
+import { isLoggedIn } from "./utils/auth";
 export default function App() {
   const [loggedIn, setLoggedIn] = useState(isLoggedIn());
   const [page, setPage] = useState("dashboard");

@@ -13,7 +13,19 @@ export const loginUser = async (credentials) => {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Login failed');
   }
-  return response.json();
+  
+  // Handle both JWT token string and JSON response
+  const contentType = response.headers.get('content-type');
+  let token;
+  
+  if (contentType && contentType.includes('application/json')) {
+    const data = await response.json();
+    token = data.token || data; // Handle both {token: "..."} and just the token string
+  } else {
+    token = await response.text();
+  }
+  
+  return { token };
 };
 
 export const registerUser = async (userData) => {
@@ -27,7 +39,19 @@ export const registerUser = async (userData) => {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.message || 'Registration failed');
   }
-  return response.json();
+  
+  // Handle both JWT token string and JSON response
+  const contentType = response.headers.get('content-type');
+  let token;
+  
+  if (contentType && contentType.includes('application/json')) {
+    const data = await response.json();
+    token = data.token || data;
+  } else {
+    token = await response.text();
+  }
+  
+  return { token };
 };
 
 // Storage Functions

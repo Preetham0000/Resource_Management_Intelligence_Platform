@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { logout, getRole } from "../utils/auth";
 const NAV = [
   { key: "dashboard", icon: "⊞", label: "Dashboard", group: "Main" },

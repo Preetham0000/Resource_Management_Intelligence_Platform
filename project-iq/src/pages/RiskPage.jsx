@@ -1,47 +1,57 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Layout, { Chip, BtnWire, Annotation, WBox, TableBase } from "../components/Layout";
-
-const NOTIFS = [
-  { type:"alert", icon:"⚠", title:"Delay risk generated for CRM Revamp",   time:"predictionGenerated · 2 min ago" },
-  { type:"task",  icon:"✓", title:'Task "ML Risk API" moved to In Progress', time:"taskStatusUpdated · 8 min ago" },
-  { type:"task",  icon:"+", title:"New task assigned to A. Mehta",           time:"taskAssigned · 15 min ago" },
-  { type:"alert", icon:"🔔", title:"Sprint 04 deadline in 8 days",           time:"sprintDeadlineAlert · 1 hr ago" },
-  { type:"info",  icon:"💬", title:"Manager feedback added by M. Kumar",     time:"managerFeedbackAdded · 2 hr ago" },
-];
+import { getRiskData } from "../utils/api";
+import { authFetch } from "../utils/auth";
 
 const notifBg = { alert:"#ff6b6b18", task:"#4f7cff18", info:"#00e5a018" };
 
-const RISK_TABLE = [
-  { name:"CRM Revamp",       vel:42, comp:"68%", util:"91%", days:5,  risk:72, status:"At Risk",  sc:"red" },
-  { name:"Supply Chain AI",  vel:38, comp:"62%", util:"87%", days:12, risk:55, status:"Moderate", sc:"yellow" },
-  { name:"Retail Analytics", vel:58, comp:"84%", util:"74%", days:20, risk:18, status:"On Track", sc:"green" },
-];
-
 export default function RiskPage({ onNav }) {
+  const [notifs, setNotifs] = useState([]);
+  const [riskTable, setRiskTable] = useState([]);
+  const [error, setError] = useState("");
   const [inputs, setInputs] = useState({ velocity:42, completion:68, utilization:91, days:5 });
-  const [mode, setMode]     = useState("rule");
+  const [mode, setMode] = useState("rule");
   const [result, setResult] = useState({ prob:72, status:"At Risk — Review Sprint Plan" });
   const [running, setRunning] = useState(false);
 
+  useEffect(() => {
+    loadRiskData();
+  }, []);
+
+  const loadRiskData = async () => {
+    try {
+      const data = await getRiskData();
+      if (data) {
+        setNotifs(data.notifications || []);
+        setRiskTable(data.riskTable || []);
+      }
+    } catch (err) {
+      setError(err.message);
+      console.error(err);
+    }
+  };
+
   const runPrediction = async () => {
-  setRunning(true);
-  const res = await fetch("/predict/1", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${localStorage.getItem("token")}`,
-    },
-    body: JSON.stringify({
-      sprint_velocity:    inputs.velocity,
-      task_completion_rate: inputs.completion,
-      team_utilization:   inputs.utilization,
-      days_remaining:     inputs.days,
-    }),
-  });
-  const data = await res.json();
-  setResult({ prob: data.delay_probability, status: data.status });
-  setRunning(false);
-};
+    setRunning(true);
+    try {
+      const response = await authFetch(`${process.env.REACT_APP_BASE_URL || 'http://localhost:8080/api'}/risk/predict`, {
+        method: "POST",
+        body: JSON.stringify({
+          sprint_velocity:    inputs.velocity,
+          task_completion_rate: inputs.completion,
+          team_utilization:   inputs.utilization,
+          days_remaining:     inputs.days,
+        }),
+      });
+      const data = await response.json();
+      setResult({ prob: data.delay_probability, status: data.status });
+    } catch (err) {
+      setError(err.message);
+      console.error(err);
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const riskColor = result.prob >= 65 ? "var(--accent3)" : result.prob >= 35 ? "var(--accent4)" : "var(--accent2)";
 
@@ -117,29 +127,35 @@ export default function RiskPage({ onNav }) {
             Live Notifications <Chip color="green">● Socket.IO</Chip>
           </div>
           <WBox>
-            {NOTIFS.map((n, i) => (
+            {notifs.length > 0 ? notifs.map((n, i) => (
               <div key={i} style={{
                 display:"flex", alignItems:"flex-start", gap:10,
                 padding:"10px 14px",
-                borderBottom: i < NOTIFS.length-1 ? "1px solid var(--border)" : "none",
+                borderBottom: i < notifs.length-1 ? "1px solid var(--border)" : "none",
                 fontSize:11,
               }}>
                 <div style={{
                   width:28, height:28, borderRadius:6,
                   display:"flex", alignItems:"center", justifyContent:"center",
                   fontSize:13, flexShrink:0,
-                  background: notifBg[n.type],
-                }}>{n.icon}</div>
+                  background: notifBg[n.type] || "#ffffff10",
+                }}>{n.icon || "ℹ"}</div>
                 <div>
                   <div style={{ color:"var(--text)", marginBottom:2 }}>{n.title}</div>
                   <div style={{ color:"var(--muted)", fontSize:10, fontFamily:"'DM Mono',monospace" }}>{n.time}</div>
                 </div>
               </div>
-            ))}
+            )) : <div style={{ padding:"10px 14px", color:"var(--muted)" }}>No notifications</div>}
           </WBox>
           <Annotation>NodeJS + Socket.IO · 5 event types wired</Annotation>
         </div>
       </div>
+
+      {error && (
+        <div style={{ padding:10, background:"#ff6b6b18", border:"1px solid #ff6b6b33", borderRadius:4, marginBottom:14, fontSize:11, color:"var(--accent3)" }}>
+          ⚠ {error}
+        </div>
+      )}
 
       {/* Risk table */}
       <div style={{ fontFamily:"'DM Mono',monospace", fontSize:10, color:"var(--muted2)", marginBottom:8, letterSpacing:1, textTransform:"uppercase" }}>
@@ -147,8 +163,8 @@ export default function RiskPage({ onNav }) {
       </div>
       <WBox style={{ overflow:"hidden" }}>
         <TableBase headers={["Project","Velocity","Completion %","Utilization %","Days Left","Risk Score","Status"]}>
-          {RISK_TABLE.map((r, i) => (
-            <tr key={i} style={{ borderBottom: i < RISK_TABLE.length-1 ? "1px solid var(--border)" : "none" }}>
+          {riskTable.map((r, i) => (
+            <tr key={i} style={{ borderBottom: i < riskTable.length-1 ? "1px solid var(--border)" : "none" }}>
               <td style={tdSt}><strong style={{ color:"var(--text)" }}>{r.name}</strong></td>
               <td style={tdSt}>{r.vel}</td>
               <td style={tdSt}>{r.comp}</td>

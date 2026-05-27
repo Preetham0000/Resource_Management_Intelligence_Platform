@@ -5,6 +5,7 @@ import pickle
 import numpy as np
 import pandas as pd
 import os
+from app.analytics import router as analytics_router
 
 app = FastAPI(title="Project Intelligence AI Engine")
 
@@ -149,3 +150,5 @@ async def update_prediction_mode(config: ModeConfiguration):
 @app.get("/config/mode")
 async def get_prediction_mode():
     return {"current_prediction_mode": PREDICTION_MODE}
+
+app.include_router(analytics_router)

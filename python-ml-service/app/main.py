@@ -1,6 +1,7 @@
 # app/main.py
 from fastapi import FastAPI, HTTPException, UploadFile, File
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional
 import pickle
 import numpy as np
 import pandas as pd
@@ -9,40 +10,74 @@ from app.analytics import router as analytics_router
 
 app = FastAPI(title="Project Intelligence AI Engine")
 
-PREDICTION_MODE = "ML"
-
-MODEL_PATH = os.path.join("app", "model.pkl")
+PREDICTION_MODE = os.getenv("PREDICTION_MODE", "ML").upper()
+MODEL_PATH = os.getenv("MODEL_PATH", os.path.join("app", "model.pkl"))
 model = None
 
 if os.path.exists(MODEL_PATH):
-    with open(MODEL_PATH, "rb") as f:
-        model = pickle.load(f)
-    print("Successfully loaded ML model binary from app/model.pkl")
+    try:
+        with open(MODEL_PATH, "rb") as f:
+            model = pickle.load(f)
+        print(f"Successfully loaded ML model binary from {MODEL_PATH}")
+    except Exception as exc:
+        print(f"WARNING: Unable to load model from {MODEL_PATH}: {exc}")
 else:
     print("WARNING: model.pkl not found! Automatically falling back to rule-based evaluation.")
 
 
 class PredictionInput(BaseModel):
-    sprint_velocity: int
-    task_completion_rate: int
-    team_utilization: int
-    days_remaining: int
+    sprint_velocity: int = Field(..., ge=0)
+    task_completion_rate: int = Field(..., ge=0, le=100)
+    team_utilization: int = Field(..., ge=0, le=200)
+    days_remaining: int = Field(..., ge=0)
 
 class ModeConfiguration(BaseModel):
-    mode: str  # Expects "RULE_BASED" or "ML"
+    mode: str
 
 def evaluate_rules(data: PredictionInput):
-    """Deterministic manual risk analysis based on project document thresholds."""
+    """Deterministic manual risk analysis based on project performance thresholds."""
     v = data.sprint_velocity
     c = data.task_completion_rate
     u = data.team_utilization
-    
-    if v > 50 and c > 80 and u < 85:
-        return {"delay_probability": 15, "status": "On Track"}
-    elif 30 <= v <= 50 or 60 <= c <= 80 or 85 <= u <= 95:
-        return {"delay_probability": 50, "status": "Moderate Risk"}
+
+    if v >= 50 and c >= 85 and u <= 85:
+        return {"delay_probability": 12, "status": "On Track"}
+    elif 30 <= v < 50 or 60 <= c < 85 or 85 < u <= 95:
+        return {"delay_probability": 48, "status": "Moderate Risk"}
     else:
-        return {"delay_probability": 90, "status": "High Risk / Delayed"}
+        return {"delay_probability": 82, "status": "High Risk / Delayed"}
+
+
+def predict_with_model(data: PredictionInput):
+    global model
+    
+    if model is None:
+        return evaluate_rules(data)
+
+    input_vector = np.array([[
+        data.sprint_velocity,
+        data.task_completion_rate,
+        data.team_utilization,
+        data.days_remaining,
+    ]])
+
+    try:
+        probabilities = model.predict_proba(input_vector)[0]
+        delay_probability_percent = int(probabilities[1] * 100)
+
+        if delay_probability_percent > 70:
+            status = "High Risk / Delayed"
+        elif delay_probability_percent > 35:
+            status = "Moderate Risk"
+        else:
+            status = "On Track"
+
+        return {
+            "delay_probability": delay_probability_percent,
+            "status": status,
+        }
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Inference processing failure: {exc}")
 
 
 @app.get("/")
@@ -55,51 +90,24 @@ def read_root():
 
 @app.post("/predict")
 async def predict_delay_risk(data: PredictionInput):
-    """
-    Exposes unified entry point for calculation routing[cite: 153].
-    Evaluates risk metrics using either the rule engine or Random Forest[cite: 121].
-    """
+    """Make a delay risk prediction using ML or rule-based model."""
     if PREDICTION_MODE == "RULE_BASED":
         return evaluate_rules(data)
-        
-    elif PREDICTION_MODE == "ML":
-        if model is None:
-            return evaluate_rules(data)
-            
-        try:
-            input_vector = np.array([[
-                data.sprint_velocity, 
-                data.task_completion_rate, 
-                data.team_utilization, 
-                data.days_remaining
-            ]])
-            
-            probabilities = model.predict_proba(input_vector)[0]
-            delay_probability_percent = int(probabilities[1] * 100)
-            
-            if delay_probability_percent > 70:
-                status = "High Risk / Delayed"
-            elif delay_probability_percent > 35:
-                status = "Moderate Risk"
-            else:
-                status = "On Track"
-                
-            return {
-                "delay_probability": delay_probability_percent,
-                "status": status
-            }
-            
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Inference processing failure: {str(e)}")
+    return predict_with_model(data)
+
+
+@app.post("/predict/{project_id}")
+async def predict_delay_risk_for_project(project_id: int, data: PredictionInput):
+    """Make a prediction for a specific project."""
+    result = predict_with_model(data) if PREDICTION_MODE == "ML" else evaluate_rules(data)
+    result["project_id"] = project_id
+    return result
 
 @app.post("/etl/process")
 async def process_bulk_csv_upload(file: UploadFile = File(...)):
-    """
-    Ingests project tracking CSV streams triggered from Spring Boot API.
-    Cleans structural formats and extracts system dashboard analytics via Pandas.
-    """
+    """Process CSV upload and extract analytics without database storage."""
     if not file.filename.endswith('.csv'):
-        raise HTTPException(status_code=400, detail="Invalid format. Only structural CSVs are supported.")
+        raise HTTPException(status_code=400, detail="Invalid format. Only CSV uploads are supported.")
         
     try:
         df = pd.read_csv(file.file)

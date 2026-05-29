@@ -13,7 +13,7 @@ def train_risk_model():
         
     df = pd.read_csv(csv_path)
     
-    X = df[["sprint_velocity", "task_completion_rate", "team_utilization", "days_remaining"]]
+    X = df[["velocity", "completion_rate", "team_utilization", "days_remaining"]]
     y = df["is_delayed"]
     
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)

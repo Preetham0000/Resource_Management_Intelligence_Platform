@@ -1,0 +1,4 @@
+task_id,project_id,sprint_id,story_points,status,priority,assignee_id,assignee_name
+1,1,10,5,DONE,HIGH,3,developer_3
+2,1,10,8,TO_DO,MEDIUM,3,developer_3
+3,1,10,15,DONE,CRITICAL,4,developer_4

@@ -14,25 +14,30 @@ PREDICTION_MODE = os.getenv("PREDICTION_MODE", "ML").upper()
 MODEL_PATH = os.getenv("MODEL_PATH", os.path.join("app", "model.pkl"))
 model = None
 
-if os.path.exists(MODEL_PATH):
-    try:
-        with open(MODEL_PATH, "rb") as f:
-            model = pickle.load(f)
-        print(f"Successfully loaded ML model binary from {MODEL_PATH}")
-    except Exception as exc:
-        print(f"WARNING: Unable to load model from {MODEL_PATH}: {exc}")
-else:
-    print("WARNING: model.pkl not found! Automatically falling back to rule-based evaluation.")
+def load_ml_model():
+    global model
+    if os.path.exists(MODEL_PATH):
+        try:
+            with open(MODEL_PATH, "rb") as f:
+                model = pickle.load(f)
+            print(f"Successfully loaded ML model binary from {MODEL_PATH}")
+        except Exception as exc:
+            print(f"WARNING: Unable to load model from {MODEL_PATH}: {exc}")
+    else:
+        print("WARNING: model.pkl not found! Automatically falling back to rule-based evaluation.")
+
+load_ml_model()
 
 
 class PredictionInput(BaseModel):
-    sprint_velocity: int = Field(..., ge=0)
-    task_completion_rate: int = Field(..., ge=0, le=100)
-    team_utilization: int = Field(..., ge=0, le=200)
-    days_remaining: int = Field(..., ge=0)
+    sprint_velocity: int = Field(..., ge=0, description="Sprint-wise velocity (story points completed)")
+    task_completion_rate: int = Field(..., ge=0, le=100, description="Percentage of tasks completed in current sprint")
+    team_utilization: int = Field(..., ge=0, le=200, description="Average team resource utilization percentage")
+    days_remaining: int = Field(..., ge=0, description="Days remaining in the sprint")
 
 class ModeConfiguration(BaseModel):
     mode: str
+
 
 def evaluate_rules(data: PredictionInput):
     """Deterministic manual risk analysis based on project performance thresholds."""
@@ -41,18 +46,21 @@ def evaluate_rules(data: PredictionInput):
     u = data.team_utilization
 
     if v >= 50 and c >= 85 and u <= 85:
-        return {"delay_probability": 12, "status": "On Track"}
+        return {"delay_probability": 12, "status": "On Track — Maintain Pace"}
     elif 30 <= v < 50 or 60 <= c < 85 or 85 < u <= 95:
-        return {"delay_probability": 48, "status": "Moderate Risk"}
+        return {"delay_probability": 48, "status": "Moderate Risk — Monitor Closely"}
     else:
-        return {"delay_probability": 82, "status": "High Risk / Delayed"}
+        return {"delay_probability": 82, "status": "At Risk — Review Sprint Plan"}
 
 
 def predict_with_model(data: PredictionInput):
     global model
     
+    # Reload model if it was trained since server start
     if model is None:
-        return evaluate_rules(data)
+        load_ml_model()
+        if model is None:
+            return evaluate_rules(data)
 
     input_vector = np.array([[
         data.sprint_velocity,
@@ -66,11 +74,11 @@ def predict_with_model(data: PredictionInput):
         delay_probability_percent = int(probabilities[1] * 100)
 
         if delay_probability_percent > 70:
-            status = "High Risk / Delayed"
+            status = "At Risk — Review Sprint Plan"
         elif delay_probability_percent > 35:
-            status = "Moderate Risk"
+            status = "Moderate Risk — Monitor Closely"
         else:
-            status = "On Track"
+            status = "On Track — Maintain Pace"
 
         return {
             "delay_probability": delay_probability_percent,
@@ -97,34 +105,110 @@ async def predict_delay_risk(data: PredictionInput):
 
 
 @app.post("/predict/{project_id}")
-async def predict_delay_risk_for_project(project_id: int, data: PredictionInput):
-    """Make a prediction for a specific project."""
-    result = predict_with_model(data) if PREDICTION_MODE == "ML" else evaluate_rules(data)
+async def predict_delay_risk_for_project(project_id: int, data: Optional[dict] = None):
+    """Make a delay risk prediction for a specific project.
+    
+    If request body (data) is not provided or incomplete, this endpoint will dynamically load
+    the project's latest sprint metrics from sprint_velocity.csv.
+    """
+    prediction_input = None
+    if data:
+        try:
+            prediction_input = PredictionInput(**data)
+        except Exception:
+            # Lacks required fields or invalid; we will attempt to load from CSV instead
+            prediction_input = None
+            
+    if prediction_input is None:
+        csv_path = os.path.join("datasets", "sprint_velocity.csv")
+        if os.path.exists(csv_path):
+            try:
+                df = pd.read_csv(csv_path)
+                proj_df = df[df["project_id"] == project_id]
+                if not proj_df.empty:
+                    # Prefer active sprint, otherwise latest sprint by sprint_id
+                    active_sprints = proj_df[proj_df["status"] == "ACTIVE"]
+                    if not active_sprints.empty:
+                        sprint_row = active_sprints.iloc[-1]
+                    else:
+                        sprint_row = proj_df.sort_values("sprint_id").iloc[-1]
+                    
+                    prediction_input = PredictionInput(
+                        sprint_velocity=int(sprint_row["velocity"]),
+                        task_completion_rate=int(sprint_row["completion_rate"]),
+                        team_utilization=int(sprint_row["team_utilization"]),
+                        days_remaining=int(sprint_row["days_remaining"])
+                    )
+            except Exception as e:
+                print(f"Error loading project details from csv for prediction: {e}")
+                
+        if prediction_input is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Project with ID {project_id} has no metrics in sprint_velocity.csv. Please upload sprint data or provide details in the request body."
+            )
+            
+    result = predict_with_model(prediction_input) if PREDICTION_MODE == "ML" else evaluate_rules(prediction_input)
     result["project_id"] = project_id
     return result
 
+
 @app.post("/etl/process")
 async def process_bulk_csv_upload(file: UploadFile = File(...)):
-    """Process CSV upload and extract analytics without database storage."""
+    """Process CSV upload, extract analytics, and save cleaned/transformed datasets locally."""
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Invalid format. Only CSV uploads are supported.")
         
     try:
         df = pd.read_csv(file.file)
-        df = df.dropna(subset=["sprint_id", "task_id"])
         
-        df["story_points"] = pd.to_numeric(df["story_points"], errors='coerce').fillna(1).astype(int)
-        df["status"] = df["status"].fillna("TO_DO").str.upper()
-        df["priority"] = df["priority"].fillna("MEDIUM").str.upper()
+        # Check required columns
+        required_cols = {"sprint_id", "task_id", "story_points", "status", "priority", "assignee_id"}
+        missing_cols = required_cols - set(df.columns)
+        if missing_cols:
+            # If not a standard task_completion CSV, try generic loading
+            df = df.dropna()
+        else:
+            df = df.dropna(subset=["sprint_id", "task_id"])
+            df["story_points"] = pd.to_numeric(df["story_points"], errors='coerce').fillna(1).astype(int)
+            df["status"] = df["status"].fillna("TO_DO").str.upper()
+            df["priority"] = df["priority"].fillna("MEDIUM").str.upper()
         
         total_tasks = len(df)
-        completed_tasks = len(df[df["status"] == "DONE"])
+        completed_tasks = len(df[df["status"] == "DONE"]) if "status" in df.columns else 0
         completion_rate = int((completed_tasks / total_tasks) * 100) if total_tasks > 0 else 0
         
-        developer_workloads = df.groupby("assignee_id")["story_points"].sum().to_dict()
-        bottleneck_developers = [
-            int(dev_id) for dev_id, points in developer_workloads.items() if points > 12
-        ]
+        total_story_points = int(df["story_points"].sum()) if "story_points" in df.columns else 0
+        
+        bottleneck_developers = []
+        if "assignee_id" in df.columns and "story_points" in df.columns:
+            developer_workloads = df.groupby("assignee_id")["story_points"].sum().to_dict()
+            bottleneck_developers = [
+                int(dev_id) for dev_id, points in developer_workloads.items() if points > 12
+            ]
+        
+        # Save processed analytics locally
+        processed_dir = os.path.join("datasets", "processed")
+        os.makedirs(processed_dir, exist_ok=True)
+        
+        cleaned_path = os.path.join(processed_dir, f"cleaned_{file.filename}")
+        df.to_csv(cleaned_path, index=False)
+        
+        # Append to reporting summary table
+        summary_path = os.path.join(processed_dir, "reporting_summary.csv")
+        summary_data = {
+            "timestamp": [pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")],
+            "file_name": [file.filename],
+            "records_processed": [total_tasks],
+            "completion_rate": [completion_rate],
+            "total_story_points": [total_story_points],
+            "bottlenecks_count": [len(bottleneck_developers)]
+        }
+        summary_df = pd.DataFrame(summary_data)
+        if os.path.exists(summary_path):
+            existing_df = pd.read_csv(summary_path)
+            summary_df = pd.concat([existing_df, summary_df], ignore_index=True)
+        summary_df.to_csv(summary_path, index=False)
         
         return {
             "status": "ETL Pipeline Executed Successfully",
@@ -132,13 +216,16 @@ async def process_bulk_csv_upload(file: UploadFile = File(...)):
             "processed_analytics": {
                 "records_processed": total_tasks,
                 "overall_task_completion_rate": completion_rate,
-                "total_story_points_allocated": int(df["story_points"].sum()),
-                "detected_bottleneck_assignee_ids": bottleneck_developers
+                "total_story_points_allocated": total_story_points,
+                "detected_bottleneck_assignee_ids": bottleneck_developers,
+                "saved_cleaned_dataset": cleaned_path,
+                "reporting_summary_updated": summary_path
             }
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Pandas ETL pipeline failure: {str(e)}")
+
 
 @app.post("/config/mode")
 async def update_prediction_mode(config: ModeConfiguration):

@@ -1,0 +1,2 @@
+timestamp,file_name,records_processed,completion_rate,total_story_points,bottlenecks_count
+2026-05-31 19:54:52,uploaded_tasks.csv,3,66,28,2

@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import Layout, { Chip, BtnWire, Annotation, WBox, TableBase } from "../components/Layout";
-import { getRiskData } from "../utils/api";
-import { authFetch } from "../utils/auth";
+import { getRiskData, predictRisk } from "../utils/api";
 
 const notifBg = { alert:"#ff6b6b18", task:"#4f7cff18", info:"#00e5a018" };
 
@@ -34,16 +33,12 @@ export default function RiskPage({ onNav }) {
   const runPrediction = async () => {
     setRunning(true);
     try {
-      const response = await authFetch(`${process.env.REACT_APP_BASE_URL || 'http://localhost:8080/api'}/risk/predict`, {
-        method: "POST",
-        body: JSON.stringify({
-          sprint_velocity:    inputs.velocity,
-          task_completion_rate: inputs.completion,
-          team_utilization:   inputs.utilization,
-          days_remaining:     inputs.days,
-        }),
+      const data = await predictRisk({
+        sprint_velocity:      inputs.velocity,
+        task_completion_rate: inputs.completion,
+        team_utilization:     inputs.utilization,
+        days_remaining:       inputs.days,
       });
-      const data = await response.json();
       setResult({ prob: data.delay_probability, status: data.status });
     } catch (err) {
       setError(err.message);

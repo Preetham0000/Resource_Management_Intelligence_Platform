@@ -13,6 +13,8 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -32,7 +34,7 @@ public class AuthController {
     private JwtTokenProvider tokenProvider;
 
     @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest) {
+    public ResponseEntity<Map<String, String>> authenticateUser(@RequestBody LoginRequest loginRequest) {
         // 1. Check credentials
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(
@@ -46,8 +48,17 @@ public class AuthController {
         // 2. Generate JWT token
         String jwt = tokenProvider.generateToken(authentication);
 
-        // 3. Return token to frontend
-        return ResponseEntity.ok(jwt); 
+        // 3. Extract role from authentication
+        String role = authentication.getAuthorities().stream()
+                .findFirst()
+                .map(Object::toString)
+                .orElse("ROLE_USER");
+
+        // 4. Return token and role as JSON
+        Map<String, String> response = new HashMap<>();
+        response.put("token", jwt);
+        response.put("role", role);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/register")

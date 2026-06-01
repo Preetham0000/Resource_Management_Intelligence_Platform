@@ -128,3 +128,21 @@ export const getRiskData = async () => {
   if (!response.ok) throw new Error('Failed to fetch risk data');
   return response.json();
 };
+
+export const predictRisk = async (input) => {
+  const response = await authFetch(`${API_BASE_URL}/risk/predict`, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw new Error('Failed to run risk prediction');
+  return response.json();
+};
+
+export const predictProjectRisk = async (projectId, predictionData) => {
+  const response = await authFetch(`${API_BASE_URL}/predict/${projectId}`, {
+    method: 'POST',
+    body: JSON.stringify(predictionData),
+  });
+  if (!response.ok) throw new Error('Failed to run project prediction');
+  return response.json();
+};

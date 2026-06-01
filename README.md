@@ -212,7 +212,7 @@ PostgreSQL      Python FastAPI
 
 ---
 
-## Suhas TG — AI & Data Analytics
+## Vyapti Gupta — Python & Data Analytics
 
 * Architected the containerized Python FastAPI microservice.
 * Built the Pandas ETL pipeline.

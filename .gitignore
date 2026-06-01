@@ -8,7 +8,11 @@ Thumbs.db
 *.bak
 .env
 .env.local
+<<<<<<< HEAD
 .metadata
+=======
+
+>>>>>>> feature/Notifications
 # ==========================================
 # IDE & Text Editors
 # ==========================================
@@ -23,12 +27,21 @@ Thumbs.db
  ==========================================
 # Module 1: Frontend (ReactJS)
 # ==========================================
+<<<<<<< HEAD
 project-iq/node_modules/
 project-iq/build/
 project-iq/dist/
 project-iq/.pnp/
 project-iq/.pnp.js
 project-iq/coverage/
+=======
+frontend-react/node_modules/
+frontend-react/build/
+frontend-react/dist/
+frontend-react/.pnp/
+frontend-react/.pnp.js
+frontend-react/coverage/
+>>>>>>> feature/Notifications
 
 # ==========================================
 # Module 2: Backend (Spring Boot)
@@ -61,10 +74,15 @@ python-ml-service/*.joblib
 # ==========================================
 # Module 4: Real-time (NodeJS)
 # ==========================================
+<<<<<<< HEAD
 node-notification-service/node_modules/
 node-notification-service/npm-debug.log*
 node-notification-service/yarn-debug.log*
 node-notification-service/yarn-error.log*
+=======
+notification-service/node_modules/
+notification-service/npm-debug.log*
+>>>>>>> feature/Notifications
 
 # ==========================================
 # Shared Data Engineering & Storage
@@ -72,4 +90,7 @@ node-notification-service/yarn-error.log*
 data-engineering/mock_data/*.csv
 data-engineering/mock_data/*.xlsx
 **/mysql-data/
+<<<<<<< HEAD
 
+=======
+>>>>>>> feature/Notifications

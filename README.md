@@ -87,7 +87,7 @@ The entire application ecosystem is containerized to guarantee environment parit
 
 ## Running the Full Stack via Docker
 
-You can spin up the entire application suite (Frontend, Spring Boot, FastAPI, Node.js, and PostgreSQL) using a single command from the root directory:
+You can spin up the entire application suite (Frontend, Spring Boot, FastAPI, Node.js, and MySQL) using a single command from the root directory:
 
 ```bash
 docker-compose up -d --build
@@ -182,7 +182,7 @@ PostgreSQL      Python FastAPI
 * AWS EC2
 * AWS S3
 * Docker Compose
-* PostgreSQL
+* MySQL
 * Spring Boot
 * React
 * FastAPI
@@ -196,7 +196,7 @@ PostgreSQL      Python FastAPI
 
 * Initialized the Spring Boot 3 architecture.
 * Engineered the JWT security layer (`JwtAuthenticationFilter`, `CustomUserDetailsService`).
-* Designed the fully normalized PostgreSQL schema.
+* Designed the fully normalized MySQL schema.
 * Developed core CRUD REST APIs for Projects, Tasks, and User Management.
 * Configured Spring Security RBAC with method-level `@PreAuthorize` annotations.
 
